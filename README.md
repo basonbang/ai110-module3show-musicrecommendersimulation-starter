@@ -17,17 +17,87 @@ Replace this paragraph with your own summary of what your version does.
 
 ## How The System Works
 
-Explain your design in plain language.
+Real-world music platforms like Spotify and YouTube Music predict what listeners will enjoy using two main strategies.
 
-Some prompts to answer:
+Collaborative filtering looks at the behavior of millions of users - what they save, skip, and playlist together - to find people with similar taste and recommend what those similar listeners loved. Content-based filtering takes a different approach: it analyzes measurable attributes of each song and matches them against a user's preferences. Most production systems combine both in hybrid-systems, but this project focuses on a pure content-based approach.
 
-- What features does each `Song` use in your system
-  - For example: genre, mood, energy, tempo
-- What information does your `UserProfile` store
-- How does your `Recommender` compute a score for each song
-- How do you choose which songs to recommend
+### Data Representation
 
-You can include a simple diagram or bullet list if helpful.
+Each **Song** carries seven scorable features:
+
+| Feature | Type | Scale |
+|---|---|---|
+| `genre` | categorical | e.g. pop, lofi, rock |
+| `mood` | categorical | e.g. happy, chill, intense |
+| `energy` | numerical | 0.0 – 1.0 |
+| `tempo_bpm` | numerical | 60 – 168 (normalized to 0–1) |
+| `valence` | numerical | 0.0 – 1.0 |
+| `danceability` | numerical | 0.0 – 1.0 |
+| `acousticness` | numerical | 0.0 – 1.0 |
+
+The **UserProfile** stores a listener's taste:
+- `favorite_genre` and `favorite_mood` (categorical targets)
+- `target_energy`, `target_valence`, `target_danceability`, `target_tempo` (numerical targets, 0–1)
+- `likes_acoustic` (boolean preference)
+
+### Algorithm Recipe
+
+The recommender uses a **Vibe-Balanced** weighted scoring strategy. Each song is scored against the user's preferences, and the top K highest-scoring songs are returned as recommendations.
+
+**Weights (sum to 1.0):**
+
+| Feature | Weight | Rationale |
+|---|---|---|
+| genre | 0.25 | Strongest single signal, but not a dealbreaker |
+| mood | 0.15 | Important for vibe, but secondary to genre |
+| energy | 0.15 | Core "feel" of a song |
+| danceability | 0.12 | How the song makes you move |
+| valence | 0.12 | Emotional positivity/negativity |
+| acousticness | 0.11 | Acoustic vs. electronic texture |
+| tempo | 0.10 | Pace of the song |
+
+Genre is the highest-weighted individual feature (0.25), but the five numerical features collectively sum to 0.60 — meaning a song that nails the vibe but misses on genre can still rank well.
+
+**Scoring rules per feature:**
+
+- **Genre and Mood (tiered matching):**
+  - Exact match = 1.0
+  - Same family = 0.5 (e.g. "indie pop" when user prefers "pop")
+  - Unrelated = 0.0
+
+  Genre families: {pop, indie pop}, {lofi, ambient}, {rock, metal}, {synthwave, electronic, darkwave, house}, {jazz, soul, blues}, {folk, classical}, {latin}, {emo}
+
+  Mood families: {chill, relaxed, peaceful}, {happy, euphoric, festive, warm}, {intense, aggressive, energetic}, {moody, melancholy, sad, dark}, {focused, nostalgic}
+
+- **Energy, Danceability, Valence (proximity):** `1 - abs(song_value - user_target)`
+- **Tempo (normalized proximity):** Normalize BPM to 0–1 via `(bpm - 60) / 108`, then `1 - abs(normalized_tempo - user_target)`
+- **Acousticness (boolean preference):** If `likes_acoustic = True`, score = song's acousticness. If `False`, score = `1 - acousticness`.
+
+**Final score** = weighted sum of all feature scores (result is 0.0 – 1.0).
+
+**Explanation format:** Each recommendation includes an explanation that mentions any matched categorical features (exact or family match), plus the top 2 highest-scoring numerical features.
+
+### Data Flow
+
+```
+Input (User Prefs + Song CSV)
+  → Process (Loop: score every song using the recipe above)
+    → Output (Sort by score descending, return top K)
+```
+
+### Expected Biases
+
+- **Genre label bias:** The similarity map is hand-curated. Genres not placed in a family (e.g. "latin", "emo") can never receive partial credit, even if a listener might consider them related to other genres. The families reflect the developer's subjective judgment, not a universal standard.
+- **Popularity blindness:** The system has no concept of song popularity, play count, or social proof. A niche song that matches the profile numerically will rank equally to a well-known hit with the same scores.
+- **Acoustic boolean oversimplification:** Real acoustic preference exists on a spectrum, but `likes_acoustic` is binary. A user who enjoys *moderately* acoustic music (e.g. 0.4–0.6) has no way to express that — they either boost or penalize acousticness entirely.
+- **High-energy and high-danceability bias:** Users who prefer mid-range values (e.g. energy around 0.5) will find that many songs score reasonably well because the proximity formula is more forgiving near the center of the 0–1 range. Users at the extremes (very low or very high) get sharper differentiation.
+- **Small catalog effects:** With only 20 songs, a single genre may have just 1–2 representatives. A user whose favorite genre has few songs in the catalog will see unrelated genres fill out their top K, which may feel like poor recommendations.
+
+### Potential Edge Cases
+
+- **Tied scores:** Two songs with identical final scores have no tiebreaker — their order depends on their position in the CSV. This could matter when K is small.
+- **No genre or mood match in catalog:** If the user's favorite genre has zero songs (exact or family), genre contributes 0.0 for every song, effectively removing 25% of the scoring range. The recommendations will be driven entirely by numerical features.
+- **All-acoustic or no-acoustic catalog:** If every song has acousticness near 1.0 or 0.0, the acousticness feature stops differentiating and its 0.11 weight is essentially wasted.
 
 ---
 
