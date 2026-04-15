@@ -202,11 +202,13 @@ Read and complete `model_card.md`:
 
 [**Model Card**](model_card.md)
 
-Write 1 to 2 paragraphs here about what you learned:
+### Biggest Learning Moment
 
-- about how recommenders turn data into predictions
-- about where bias or unfairness could show up in systems like this
+My biggest learning moment was realizing just how much planning is required to understand the underlying system for a basic algorithm. There are tons of different directions and decisions you can make when designing your system — how much weight should genre get versus energy? Should mood matching be exact or tiered? Should acousticness be a boolean or a slider? Each of these is a small design choice, but they compound into a system that behaves in ways you might not predict. It is helpful to note these decisions down so that you can come back to old ideas or explore different directions. For example, when we removed mood from the scoring, the entire ranking behavior shifted — songs that relied on vibe alignment disappeared from recommendations, and the system collapsed into pure genre-plus-numbers matching. That one experiment taught me more about how the features interact than just reading the weights ever could.
 
+### How AI Tools Helped (and When I Double-Checked Them)
+
+AI tools like Claude Code practically generated the whole project and guided my direction. I learned many things about how music recommendation systems work thanks to AI, including concepts like proximity scoring, tiered categorical matching, and how weighted sums turn messy preferences into a single number. I also picked up coding practices from Claude's generated code — things like using `csv.DictReader` to parse rows as dictionaries and sorting with lambda key functions. That said, I made sure to verify and read the output of everything the AI generated. When there was code that confused me, I would ask it to explain it to me, and oftentimes I just rewrote it in a simpler way. The AI was strongest at scaffolding — setting up the data flow, defining the scoring structure, writing boilerplate. But the interesting decisions (which genre families to group, how to weight features, what edge cases to test) all required human judgment. The AI could suggest options, but it couldn't tell me which option *felt right* for the kind of recommender I wanted to build.
 
 ---
 
