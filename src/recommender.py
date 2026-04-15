@@ -50,10 +50,7 @@ class Recommender:
         return "Explanation placeholder"
 
 def load_songs(csv_path: str) -> List[Dict]:
-    """
-    Loads songs from a CSV file.
-    Required by src/main.py
-    """
+    """Parse a CSV file and return a list of song dicts with typed fields."""
     numeric_fields = {"energy", "tempo_bpm", "valence", "danceability", "acousticness"}
     songs = []
     with open(csv_path, newline="") as f:
@@ -66,10 +63,7 @@ def load_songs(csv_path: str) -> List[Dict]:
     return songs
 
 def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
-    """
-    Scores a single song against user preferences.
-    Required by recommend_songs() and src/main.py
-    """
+    """Return a weighted proximity score and list of match reasons for a song."""
     GENRE_FAMILIES = [
         {"pop", "indie pop"},
         {"lofi", "ambient"},
@@ -89,6 +83,7 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     ]
 
     def tiered_match(user_val, song_val, families):
+        """Return 1.0 for exact match, 0.5 for same family, or 0.0 for no match."""
         if user_val == song_val:
             return 1.0
         for family in families:
@@ -152,10 +147,7 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     return (total_score, reasons)
 
 def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
-    """
-    Functional implementation of the recommendation logic.
-    Required by src/main.py
-    """
+    """Score all songs against user preferences and return the top k sorted by score."""
     scored = []
     for song in songs:
         score, reasons = score_song(user_prefs, song)
