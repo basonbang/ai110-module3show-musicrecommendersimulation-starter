@@ -138,12 +138,47 @@ You can add more tests in `tests/test_recommender.py`.
 
 ## Experiments You Tried
 
-Use this section to document the experiments you ran. For example:
-![alt text](image.png)
+We ran the recommender against six user profiles — three distinct taste profiles and three adversarial/edge-case profiles — to evaluate how the scoring logic behaves.
 
-- What happened when you changed the weight on genre from 2.0 to 0.5
-- What happened when you added tempo or valence to the score
-- How did your system behave for different types of users
+### Distinct User Profiles
+
+**1. High-Energy Pop** — genre: pop, mood: happy, energy: 0.9, danceability: 0.85, valence: 0.8, likes_acoustic: False
+
+Top result: Sunrise City (0.94). The system correctly prioritizes pop songs with high energy and danceability. All top 3 are pop/indie pop with happy vibes.
+
+![High-Energy Pop recommendations](screenshots/high_energy_pop.png)
+
+**2. Chill Lofi** — genre: lofi, mood: chill, energy: 0.3, danceability: 0.5, valence: 0.6, likes_acoustic: True
+
+Top result: Library Rain (0.96). Lofi and ambient songs dominate. The acoustic preference boosts songs like Library Rain (0.86 acousticness) and Spacewalk Thoughts (0.92).
+
+![Chill Lofi recommendations](screenshots/chill_lofi.png)
+
+**3. Deep Intense Rock** — genre: rock, mood: intense, energy: 0.95, danceability: 0.6, valence: 0.3, likes_acoustic: False
+
+Top result: Storm Runner (0.95). Rock and metal rank highest. Gym Hero (#3, pop/intense) sneaks in due to its extreme energy (0.93) matching the profile despite a genre mismatch.
+
+![Deep Intense Rock recommendations](screenshots/deep_intense_rock.png)
+
+### Adversarial / Edge-Case Profiles
+
+**4. High Energy + Sad Mood (conflicting vibes)** — genre: pop, mood: sad, energy: 0.9, danceability: 0.8, valence: 0.2, likes_acoustic: False
+
+This profile has contradictory signals: high energy and danceability suggest upbeat music, but "sad" mood and low valence suggest somber tracks. The system compromises — Gym Hero and Sunrise City rank top (genre match + energy), while Broken Neon (emo/sad) appears at #3. The system can't truly satisfy both desires at once.
+
+![High Energy + Sad Mood recommendations](screenshots/edge_high_energy_sad.png)
+
+**5. Non-existent Genre (country)** — genre: country, mood: happy, energy: 0.5, danceability: 0.5, valence: 0.5
+
+"Country" doesn't exist in our catalog or genre families, so genre contributes 0.0 for every song — effectively removing 25% of the scoring range. The remaining features drive recommendations, resulting in a scattered top 5 with no genre coherence. Sunday Morning Tea (soul/warm) wins simply because its numerical features are closest to the midpoint values.
+
+![Non-existent Genre recommendations](screenshots/edge_nonexistent_genre.png)
+
+**6. All-Zero Numericals** — genre: rock, mood: chill, energy: 0.0, danceability: 0.0, valence: 0.0, tempo: 0.0, likes_acoustic: True
+
+Extreme edge case where every numerical target is 0. No song in the catalog has values this low, so the system recommends the *least* energetic, danceable, and loud songs. Spacewalk Thoughts (ambient/chill, energy 0.28) tops the list despite being the wrong genre — mood match + low-energy proximity outweigh the genre mismatch. Rock songs barely appear because they tend to have high energy.
+
+![All-Zero Numericals recommendations](screenshots/edge_all_zero.png)
 
 ---
 
