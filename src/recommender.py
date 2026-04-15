@@ -29,6 +29,9 @@ class UserProfile:
     favorite_mood: str
     target_energy: float
     likes_acoustic: bool
+    target_valence: float = 0.5
+    target_danceability: float = 0.5
+    target_tempo: float = 0.5
 
 class Recommender:
     """
@@ -67,15 +70,97 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     Scores a single song against user preferences.
     Required by recommend_songs() and src/main.py
     """
-    # TODO: Implement scoring logic using your Algorithm Recipe from Phase 2.
-    # Expected return format: (score, reasons)
-    return []
+    GENRE_FAMILIES = [
+        {"pop", "indie pop"},
+        {"lofi", "ambient"},
+        {"rock", "metal"},
+        {"synthwave", "electronic", "darkwave", "house"},
+        {"jazz", "soul", "blues"},
+        {"folk", "classical"},
+        {"latin"},
+        {"emo"},
+    ]
+    MOOD_FAMILIES = [
+        {"chill", "relaxed", "peaceful"},
+        {"happy", "euphoric", "festive", "warm"},
+        {"intense", "aggressive", "energetic"},
+        {"moody", "melancholy", "sad", "dark"},
+        {"focused", "nostalgic"},
+    ]
+
+    def tiered_match(user_val, song_val, families):
+        if user_val == song_val:
+            return 1.0
+        for family in families:
+            if user_val in family and song_val in family:
+                return 0.5
+        return 0.0
+
+    weights = {
+        "genre": 0.25,
+        "mood": 0.15,
+        "energy": 0.15,
+        "danceability": 0.12,
+        "valence": 0.12,
+        "acousticness": 0.11,
+        "tempo": 0.10,
+    }
+
+    scores = {}
+    reasons = []
+
+    # --- Categorical features ---
+    scores["genre"] = tiered_match(user_prefs.get("genre", ""), song["genre"], GENRE_FAMILIES)
+    if scores["genre"] == 1.0:
+        reasons.append(f"Genre match: {song['genre']}")
+    elif scores["genre"] == 0.5:
+        reasons.append(f"Similar genre: {song['genre']}")
+
+    scores["mood"] = tiered_match(user_prefs.get("mood", ""), song["mood"], MOOD_FAMILIES)
+    if scores["mood"] == 1.0:
+        reasons.append(f"Mood match: {song['mood']}")
+    elif scores["mood"] == 0.5:
+        reasons.append(f"Similar mood: {song['mood']}")
+
+    # --- Numerical features (proximity scoring) ---
+    for feature in ["energy", "danceability", "valence"]:
+        user_target = user_prefs.get(feature, 0.5)
+        scores[feature] = 1 - abs(song[feature] - user_target)
+
+    # --- Tempo (normalized proximity) ---
+    normalized_tempo = (song["tempo_bpm"] - 60) / 108
+    user_tempo_target = user_prefs.get("tempo", 0.5)
+    scores["tempo"] = 1 - abs(normalized_tempo - user_tempo_target)
+
+    # --- Acousticness (boolean preference) ---
+    likes_acoustic = user_prefs.get("likes_acoustic", True)
+    if likes_acoustic:
+        scores["acousticness"] = song["acousticness"]
+    else:
+        scores["acousticness"] = 1 - song["acousticness"]
+
+    # --- Weighted sum ---
+    total_score = sum(weights[f] * scores[f] for f in weights)
+
+    # --- Top 2 numerical reasons ---
+    numerical_features = ["energy", "danceability", "valence", "acousticness", "tempo"]
+    # Each feature is sorted by their score, only taking the top 2 
+    top_numerical = sorted(numerical_features, key=lambda f: scores[f], reverse=True)[:2]
+    for f in top_numerical:
+        reasons.append(f"Strong {f} match ({scores[f]:.2f})")
+
+    return (total_score, reasons)
 
 def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
     """
     Functional implementation of the recommendation logic.
     Required by src/main.py
     """
-    # TODO: Implement scoring and ranking logic
-    # Expected return format: (song_dict, score, explanation)
-    return []
+    scored = []
+    for song in songs:
+        score, reasons = score_song(user_prefs, song)
+        scored.append((song, score, " | ".join(reasons)))
+
+    # Sort songs by their score in descending order, returning the top k
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return scored[:k]
